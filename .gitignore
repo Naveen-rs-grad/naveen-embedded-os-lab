@@ -1,0 +1,15 @@
+cat > .gitignore <<'EOF'
+# Compiled binaries
+*.o
+*.out
+*.exe
+*.elf
+*.bin
+
+# Build directories
+build/
+exe/
+
+# Ignore the upstream xv6 repository
+/xv6/xv6-riscv/
+EOF
