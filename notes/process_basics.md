@@ -7,6 +7,8 @@
 The `fork()` system call creates a new process
 called the child process.
 
+#include "user/user.h" - This header declares the fork() function so the compiler knows its interface. in XV6
+
 ### Example Code
 
 ```c
@@ -183,3 +185,68 @@ QEMU is an open-source emulator and virtualizer that allows us to run operating 
 QEMU allows us to execute and debug RISC-V operating systems like xv6 on an x86-64 computer without owning a physical RISC-V processor.
 
 XV6 is return for RISC V processor, which is emulated with QEMU
+
+#### What happens to CPU registers when a trap occurs?
+
+RISC V Register groups 
+
+<p align="center">
+  <img src="Images/RISCV_Reg_grps.png" width="500">
+</p>
+
+RISC V & ARM calling conventions
+<p align="center">
+  <img src="Images/RISCV_ARM_Calling_conventions.png" width="500">
+</p>
+
+How can the kernel use CPU registers without destroying the user's values?
+Here there are two concepts involved trap frame and context
+
+```
+User program
+    |
+    | ecall
+    v
+Save user registers → Trapframe
+    |
+    v
+Kernel handles system call
+    |
+    v
+Restore user registers ← Trapframe
+    |
+    v
+User program resumes
+```
+
+trapframe is used when kernel switches to new process and context is used when the task gets premmpted so that kernal has to save all the current executing task onto memory usually stack
+
+when trap has occured which is happened while the ecall instruiction is exceuted, the hardware acknowledges the exeption request
+
+What exactly does RISC-V hardware do when ecall executes? why we involve hardware?
+Before ecall, the CPU executes your application in user mode (U-mode).The kernel needs supervisor privileges to access protected kernel structures and manage processes. So the CPU must safely transfer execution into supervisor mode.
+
+
+<p align="center">
+  <img src="Images/ecall_inside_cpu.png" width="500">
+</p>
+
+entering supervisor mode does not automatically give the CPU a new stack or a new set of registers.
+
+If you check trampoline.s
+you will find
+```
+sd ra, 40(a0)
+sd sp, 48(a0)
+sd gp, 56(a0)
+sd tp, 64(a0)
+sd t0, 72(a0)
+```
+
+li a0, TRAPFRAME - a0 contains the base address of the trap frame
+
+'sd sp, 48(a0)' what does this mean? - sp = Memory[a0 + 48] which contains the stack pointer
+
+<p align="center">
+  <img src="Images/trapframe_1.png" width="500">
+</p>
