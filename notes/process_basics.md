@@ -250,3 +250,129 @@ li a0, TRAPFRAME - a0 contains the base address of the trap frame
 <p align="center">
   <img src="Images/trapframe_1.png" width="500">
 </p>
+
+
+The CPU has entered supervisor mode, but it is still using the user's page table and hasn't switched to the process's kernel stack. How can it safely execute kernel C code?
+
+## Switching from the user environment to the kernel environment
+
+```
+User program
+    |
+    | fork()
+    v
+System-call stub
+    |
+    | a7 = SYS_fork
+    | ecall
+    v
+RISC-V hardware trap
+    |
+    | U-mode → S-mode
+    v
+trampoline.S : uservec
+    |
+    | Save user registers into trapframe
+    v
+WE ARE HERE
+```
+
+Component -	Current state,
+Privilege mode - 	Supervisor mode,
+CPU general-purpose registers	- User values saved in trapframe,
+sp	- Still holds the user's stack pointer,
+Active page table	- User page table,
+Kernel fork()	- Not executed yet,
+
+Open kernel/trampoline.S
+
+Immediately after the instructions that save the user's registers, you'll find:
+
+```
+# Initialize kernel stack pointer
+ld sp, 8(a0)
+
+# Load current CPU/hart ID
+ld tp, 32(a0)
+
+# Load address of usertrap()
+ld t0, 16(a0)
+
+# Load kernel page table value
+ld t1, 0(a0)
+
+sfence.vma zero, zero
+
+# Switch to kernel page table
+csrw satp, t1
+
+sfence.vma zero, zero
+
+# Jump to usertrap()
+jalr t0
+```
+user process already has its own stack.
+
+But the kernel cannot safely rely on the user's stack while performing privileged operations.
+
+Why?
+
+Because the user stack belongs to the user process's memory environment. Its mapping and contents may be unsuitable or maliciously manipulated, and kernel execution needs a protected stack of its own.
+
+Therefore, xv6 gives each process a separate kernel stack.
+
+Notice that this is different from the trapframe.
+- Trapframe: preserves the application's CPU register state.
+- Kernel stack: supports kernel function execution.
+
+
+```
+ld sp, 8(a0)
+```
+
+Sp means stack pointer here, and ld means load double. And here a zero is the base address, and from the base address we are offsetting eight. And usually this contains the address of the stack pointer. That's what this instruction is doing.
+
+Important: RISC-V does not have a separate physical sp register for the user and kernel. The same register receives a different pointer value.
+
+The original user sp was saved earlier in the trapframe, so it can be restored when returning to user mode.
+
+Instruction: ld tp, 32(a0)
+
+This loads the current hardware thread identifier (hart ID) into the tp register.
+
+A **hart** is a RISC-V hardware execution context. In a multicore emulated system, each hart can execute instructions independently.
+
+xv6 uses tp to help identify the current CPU.
+
+Why is this needed?
+
+Because kernel code may need to access CPU-specific information, such as the current process or scheduler state.
+
+For now, remember:
+
+tp identifies the current hart for xv6's kernel code.
+
+**Switching to the kernel page table**
+
+ld t1, 0(a0)
+
+The field at offset 0 is kernel_satp.
+
+It contains the value needed to activate the kernel page table.
+
+```
+sfence.vma zero, zero
+csrw satp, t1
+sfence.vma zero, zero
+```
+
+The satp register controls the active address-translation configuration in RISC-V supervisor mode.
+
+Writing the kernel's satp value activates the kernel page-table configuration.
+
+The comple flow looks like:
+<p align="center">
+  <img src="Images/user2kernel_pagetable.png" width="500">
+</p>
+
+satp is a RISC-V control register used to configure address translation, including the active page-table root.
