@@ -33,6 +33,10 @@ What if a program expects its data at a particular address, but that physical RA
 
 We need a way to make programs independent of where their data actually resides in RAM.
 
+<p align="center">
+  <img src="Images/page.png" width="500">
+</p>
+
 That's where virtual memory and paging come in.
 
 <p align="center">
@@ -150,3 +154,111 @@ The trampoline prepares that environment by activating the kernel page table.
 Importantly, switching privilege modes and switching page tables are different operations.
 - ecall triggers the CPU's privilege transition.
 - The trampoline later changes the active page-table configuration.
+
+
+# Multi-Level Page Tables in RISC-V (Sv39)
+
+Why does an operating system need multiple levels of page tables, and how does the MMU use them to find physical memory?
+
+<p align="center">
+  <img src="Images/multi_level_paging.png" width="500">
+</p>
+
+### Understanding Multi-Level Paging in RISC-V (Sv39)
+
+Let's first take a simple example of a 4-bit virtual address. Since we have 4 bits to represent an address, we can represent \(2^4 = 16\) different byte addresses, assuming byte-addressable memory.
+
+Similarly, RISC-V uses an addressing scheme called **Sv39**, which uses 39 significant bits for virtual addressing. This means we can represent \(2^{39}\) different virtual byte addresses. However, this doesn't necessarily mean that the system has \(2^{39}\) bytes of physical RAM. It simply defines the virtual address range supported by this addressing scheme, and a process doesn't necessarily use all those addresses.
+
+Now, in xv6, **each page has a size of 4 KiB**, which is \(4096 = 2^{12}\) bytes. The corresponding physical memory frames are also 4 KiB in size. Since each page contains \(2^{12}\) byte positions, we need **12 bits to identify the offset within a page**.
+
+So, out of the 39 significant virtual address bits, 12 bits are used for the page offset, and the remaining bits are used to identify the virtual page number.
+
+\[
+39-12=27\text{ bits}
+\]
+
+Therefore, the virtual address is divided into:
+
+- **27 bits:** Virtual Page Number (VPN), identifying which virtual page is being accessed.
+- **12 bits:** Page offset, identifying the byte within that page.
+
+This means the Sv39 address space can represent:
+
+\[
+2^{27}=134,217,728\text{ virtual pages}
+\]
+
+Now comes the problem. The operating system needs a **page table**, which is a data structure stored in memory, to maintain the mapping between virtual pages and physical memory frames.
+
+Suppose we implement a simple single-level page table containing one entry for every possible virtual page. In Sv39, each Page Table Entry (PTE) occupies **8 bytes**.
+
+Therefore, the total memory needed for such a flat page table would be:
+
+\[
+2^{27}\times8=2^{30}\text{ bytes}=1\text{ GiB}
+\]
+
+This means a fully allocated, single-level page table covering the entire Sv39 virtual address range would consume **1 GiB of memory**, even if the process actually uses only a small portion of that address space.
+
+The problem is that we are unnecessarily allocating page-table memory for virtual pages that the process never uses.
+
+**This is why multi-level paging is introduced.**
+
+Instead of maintaining one enormous flat page table, we divide the page-to-frame mapping into a **hierarchical, tree-like structure**, consisting of a root page table, intermediate page tables, and leaf entries.
+
+The root and intermediate entries help us navigate through the hierarchy, while the leaf entries provide the actual virtual-to-physical memory mappings.
+
+The important advantage is that **we don't need to allocate every possible node in the tree**. We allocate lower-level page tables only for the virtual address regions that require mappings. If an entire region of virtual memory is unused, the corresponding lower-level page tables need not exist.
+
+In this way, multi-level paging significantly reduces page-table memory consumption for processes that use only a small portion of their available virtual address space.
+
+**Key takeaway:** Multi-level paging doesn't reduce the actual memory required by the program's data. Instead, it reduces the overhead of storing virtual-to-physical address mappings by avoiding unnecessary page-table allocations.
+
+All three levels of page tables are stored in physical RAM.
+
+They are ordinary memory structures created and maintained by the operating system.
+
+The root table contains entries pointing to intermediate tables. Intermediate tables contain entries pointing to other tables. Leaf entries map virtual pages to the physical frames holding program data.
+
+# Page Table Entries (PTEs) and Memory Permissions
+
+Just because a virtual address maps to physical RAM, should a program be allowed to read, write, or execute anything at that address?
+
+So in page table entry doesn't only contain the page number to the frame mapping. It also consists of flags which the kernel can use to identify the memory access restrictions.
+
+V = 1  Valid mapping
+R = 1  Reading permitted
+W = 0  Writing not permitted
+X = 1  Instruction execution permitted
+U = 1  User-mode access permitted
+
+
+### Case A - user code page
+
+V=1, R=1, W=0, X=1, U=1
+Your program can execute instructions from the page.
+But if it tries to write to that page, the MMU rejects the operation and raises an exception.
+
+### Case B — User data page
+
+V=1, R=1, W=1, X=0, U=1
+Your program can read and modify variables stored in the page.
+However, it cannot execute instructions from that page.
+This helps prevent accidental or malicious execution of data as code.
+
+### Case C — Kernel code page
+V=1, R=1, W=0, X=1, U=0
+The U=0 bit means user-mode code cannot directly access this page.
+Supervisor-mode access follows additional RISC-V privilege rules; U=0 does not by itself grant unrestricted access.
+This is one part of how the OS protects kernel code from applications.
+
+What happens when a program violates a permission?
+
+Virtual address → 0x4000
+
+Page table entry:
+V=1, R=1, W=0, X=1, U=1
+
+The CPU attempts a store instruction. The MMU checks the PTE and sees W=0. The write is not permitted.
+The CPU raises a store page-fault exception, transferring control to the kernel's trap handler.
