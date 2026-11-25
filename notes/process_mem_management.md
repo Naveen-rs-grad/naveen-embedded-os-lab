@@ -262,3 +262,73 @@ V=1, R=1, W=0, X=1, U=1
 
 The CPU attempts a store instruction. The MMU checks the PTE and sees W=0. The write is not permitted.
 The CPU raises a store page-fault exception, transferring control to the kernel's trap handler.
+
+Mmeory Functions:
+
+Kalloc() -> ptr
+Kfree(ptr)
+Kinit()
+
+The free pages are present in free list and connected as linked list 
+
+```
+struct {
+  struct spinlock lock;
+  struct run *freelist;
+} kmem;
+```
+
+Kalloc:
+
+```
+// Allocate one 4096-byte page of physical memory.
+// Returns a pointer that the kernel can use.
+// Returns 0 if the memory cannot be allocated.
+void *
+kalloc(void)
+{
+  struct run *r;
+
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  if (r)
+    kmem.freelist = r->next; //since the head(r) is allocated the free list moves to next pointed free list
+  release(&kmem.lock);
+
+  if (r)
+    memset((char *)r, 5, PGSIZE); // fill with junk
+  return (void *)r;
+}
+```
+
+Free:
+
+```
+// Free the page of physical memory pointed at by pa,
+// which normally should have been returned by a
+// call to kalloc().  (The exception is when
+// initializing the allocator; see kinit above.)
+void
+kfree(void *pa) //pa is the page address which is no longer needed
+{
+  struct run *r;
+
+  if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kfree");
+
+  // Fill with junk to catch dangling refs.
+  memset(pa, 1, PGSIZE);
+
+  r = (struct run *)pa;
+
+  acquire(&kmem.lock);
+  r->next = kmem.freelist; //adding the free'd list back to freelist
+  kmem.freelist = r;
+  release(&kmem.lock);
+}
+```
+
+so free list is the linked list of pages , now when we need a page the head is allocated and free list moves next, similarly when the page is released then the free'd page is inserted to the free list as a head
+
+so insetion and deletion happens on the same end
+
