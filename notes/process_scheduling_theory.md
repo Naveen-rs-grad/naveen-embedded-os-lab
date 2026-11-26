@@ -264,3 +264,27 @@ Here we take the two task A and B. We say that task A has the period twenty and 
 
 Now comes the earliest deadline scheduling. Now, based on the absolute deadline, which is shown in the top diagram, the tasks are getting scheduled. Now, at T equal to zero, we need to choose Which task to run from A and B, A has the nearest deadline, earliest deadline. So A is scheduled. Now B1, the first instance of B is getting scheduled. Now at T is equal to twenty, Here we have two jobs, A and B. So Now A2 is getting scheduled as the deadline of A2 is near. So A2 gets scheduled, and then followed by B1, the first instance of B. Now we have again two jobs, at T equal to 40. Now here the deadline for B is nearer than A3 deadline. So the B1 continues, and then A3 gets scheduled. And this is how we achieve the EDF scheduling, and the scheduling here is dynamic, based on the absolute deadline of each task.
 
+## Priority inversion
+
+Priority inversion occurs when a high-priority task must wait for a resource held by a lower-priority task. The scheduler still chooses the highest-priority ready task. The word ready matters: once the high-priority task blocks on the resource, it cannot use the CPU.
+
+Suppose two tasks use the same display. The display has a lock so that one task can finish writing a message before another task starts writing. The task that takes the lock keeps it until it releases it.
+1. L, the low-priority task, starts writing. It takes the display lock. It needs 2 more milliseconds of CPU time to finish writing and release the lock.
+2. H, the high-priority task, becomes ready. The scheduler pauses L and gives H the CPU. Pausing L does not release its lock. L still owns the display.
+3. H tries to take the display lock. The lock is already held, so H becomes blocked. H still has the highest priority, but it cannot continue until L releases the lock.
+Pause here. What has to happen for H to continue? L has to run. That dependency is the basic priority inversion: the progress of the highest-priority task now depends on the lowest-priority task.
+Why textbooks add a medium-priority task
+If H and L are the only tasks, the scheduler can immediately run L. Two milliseconds later, L unlocks the display and H continues. Now suppose M, a medium-priority task, is also ready when H blocks. M needs 5 ms and never uses the display.
+Task	State at that instant	What the scheduler sees
+H — high	Blocked on the display lock	Cannot run
+M — medium	Ready	Highest-priority ready task
+L — low	Ready and holding the lock	Can run, but M outranks it
+
+
+Who runs next? M. M runs for 5 ms. Then L runs for 2 ms and releases the display. Only then can H continue. H waited 7 ms for a lock that needed just 2 ms of work to release.
+
+That is what makes the situation an inversion. M’s work goes ahead of H’s work, even though H has higher priority and M never touches the display. M can delay H indirectly because it keeps L off the CPU. H’s assigned priority never changed.
+How priority inheritance fixes it
+When H blocks on L’s lock, the OS temporarily gives L the same priority as H. The scheduler now runs L ahead of M. L finishes its remaining 2 ms, unlocks the display, and returns to low priority. H can then take the lock and run. H’s wait drops from 7 ms to 2 ms.
+
+Why boost L? H already has the highest priority. Giving H more priority cannot open the lock. Giving the lock owner enough CPU time to finish can.
