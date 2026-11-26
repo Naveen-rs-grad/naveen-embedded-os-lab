@@ -264,6 +264,12 @@ Here we take the two task A and B. We say that task A has the period twenty and 
 
 Now comes the earliest deadline scheduling. Now, based on the absolute deadline, which is shown in the top diagram, the tasks are getting scheduled. Now, at T equal to zero, we need to choose Which task to run from A and B, A has the nearest deadline, earliest deadline. So A is scheduled. Now B1, the first instance of B is getting scheduled. Now at T is equal to twenty, Here we have two jobs, A and B. So Now A2 is getting scheduled as the deadline of A2 is near. So A2 gets scheduled, and then followed by B1, the first instance of B. Now we have again two jobs, at T equal to 40. Now here the deadline for B is nearer than A3 deadline. So the B1 continues, and then A3 gets scheduled. And this is how we achieve the EDF scheduling, and the scheduling here is dynamic, based on the absolute deadline of each task.
 
+
+### Why a feasible schedule can miss a deadline on hardware
+
+1. Context switch overhead
+2. Caching - due ot cache miss
+
 ## Priority inversion
 
 Priority inversion occurs when a high-priority task must wait for a resource held by a lower-priority task. The scheduler still chooses the highest-priority ready task. The word ready matters: once the high-priority task blocks on the resource, it cannot use the CPU.
@@ -288,3 +294,48 @@ How priority inheritance fixes it
 When H blocks on L’s lock, the OS temporarily gives L the same priority as H. The scheduler now runs L ahead of M. L finishes its remaining 2 ms, unlocks the display, and returns to low priority. H can then take the lock and run. H’s wait drops from 7 ms to 2 ms.
 
 Why boost L? H already has the highest priority. Giving H more priority cannot open the lock. Giving the lock owner enough CPU time to finish can.
+
+
+# Power management
+
+putting the CPU to sleep changes when it can start the next job, and slowing the CPU changes when the current job will finish. Both decisions affect deadlines. The scheduler knows which jobs are ready, when periodic jobs will arrive, and when their results are due. That information helps the OS decide how much energy it can safely save.
+
+Suppose a sensor produces a reading every 10 ms. Processing one reading takes 2 ms at full CPU speed. Assume this is the only task and its deadline is 10 ms after release. The OS has two options:
+
+1. Run fast, then sleep
+2. Run slower at a lower voltage
+
+An idle CPU or device still consumes power. The OS can put it into a lighter or deeper sleep state. Deeper sleep generally saves more power while asleep, but entering and leaving it costs time and energy. Two separate checks matter:
+- Deadline check: Can the device wake early enough to do the required work?
+- Energy check: Is the idle interval long enough for the energy saved during sleep to outweigh the transition cost? The minimum worthwhile interval is called the break-even time.
+
+| Policy from the slides | How it works | Main tradeoff |
+|---|---|---|
+| **Request-driven** | Wake when a request arrives. | Simple, but the request experiences the wake-up delay. |
+| **Predictive** | Estimate when the next request will arrive and plan shutdown or wake-up around it. | Waking too early wastes energy. Waking too late delays service. |
+| **Probabilistic** | Use request-arrival statistics to balance expected energy and response time. | A good average response time alone cannot guarantee a hard deadline. |
+
+**Advanced Configuration and Power Interface - ACPI**
+
+ACPI is an open standard for power management services
+
+<p align="center">
+  <img src="Images/EOS/eos_6.png" width="500">
+</p>
+
+ACPI gives the OS a standard interface for platform power management.
+
+states : working (G0), sleeping (G1), soft off (G2), and mechanical off (G3).
+
+**Dynamic Voltage and Frequency Scaling (DVFS)** lets the system adjust CPU clock frequency and supply voltage while it operates. To understand why both matter, distinguish power (energy used per second) from energy per job (the total spent finishing the work).
+
+$P_{\mathrm{dynamic}} \propto V^2 f$
+
+$t_{\mathrm{job}} \approx \frac{N_{\mathrm{cycles}}}{f}$
+
+$E_{\mathrm{dynamic,job}} = P_{\mathrm{dynamic}}t_{\mathrm{job}} \propto V^2 N_{\mathrm{cycles}}$
+
+The OS and hardware have different responsibilities here. The task scheduler chooses which job runs. The voltage scheduler uses the work and deadlines of all active tasks to select a suitable speed.
+
+Utilization tells you how much idle time exists. The placement of jobs tells you whether that time is usable for sleep.
+
