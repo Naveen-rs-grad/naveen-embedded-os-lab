@@ -170,9 +170,69 @@ Drawbacks:
 
 # Prioirty based scheduling
 
-
+A priority is a rank that determines which ready task gets the CPU. A preemptive scheduler can pause a running job when a higher-priority job becomes ready. The paused job later resumes with its remaining work. The scheduler is work-conserving if it keeps the CPU busy whenever any job is ready.
 
 ## RMS
+
+A static priority-driven preemptive scheduling algorithm - Fixed priority assignment
+
+Under rate-monotonic scheduling (RMS), there’s a rule: among the ready tasks, run the one with the shortest period.
+
+Rate means how often a task releases a job. A task with a shorter period releases jobs more frequently and gets a higher priority.
+
+Less period - higher rate
+
+Assumptions:
+1. Tasks are periodic; any aperiodic task has no deadline
+2. All tasks run on single processor
+3. Zero context switch time
+4. Tasks are independent (no inter-task dependencies)
+
+
+<p align="center">
+  <img src="Images/EOS/eos_4.png" width="500">
+</p>
+
+If we consider the task allocation example under the RMS scheduling technique, so here we can see we have three tasks: task one, two, three. So task one has period four, task two has period five, task three has period seven. Now, according to the rate monotonic scheduling, task one has higher priority, task two has second highest priority, and task three has the lowest priority. That is because task one period is four, one by four, is greater than one by five, greater than one by seven. So, if we take the lower section of the diagram, we can say that task one gets scheduled, and then once completion, task two gets scheduled, and after completion, task three, some part gets scheduled, and when the next period of task one arrives, since it has the highest priority. The second instance of task one gets scheduled, and after that, the second instance of task two gets scheduled, and we and the task three misses the deadline In this case.
+
+Now comes the utilization bound, Use each task’s worst-case computation time.
+
+$U = \sum_{i=1}^{n}\frac{C_i}{P_i}$
+
+$U_{\mathrm{lub}} = n\left(2^{1/n}-1\right)$
+
+$U \leq U_{\mathrm{lub}} \implies \text{all deadlines are met under RMS}$
+
+The RMS utilization bound depends on the number of tasks.
+
+The RMS bound answers one question: If all I know is the number of tasks and their total CPU utilization, how much utilization can I safely guarantee will meet **every** deadline?
+
+Imagine two tasks on one CPU. Their deadlines equal their periods, and both release at time 0.
+
+| Task | Period | CPU time needed per job |
+|---|---:|---:|
+| A | 5 ms | 2 ms |
+| B | 7 ms | 3.1 ms |
+
+Together they use about 84.3% of the CPU. That sounds comfortable. Now look specifically at B’s first 7 ms:
+- 0–2 ms: A runs first because it has the shorter period.
+- 2–5 ms: B gets 3 ms of CPU time. It still needs 0.1 ms.
+- 5–7 ms: A releases again and preempts B. At 7 ms, B misses its deadline by that remaining 0.1 ms of work.
+This is the reason for the bound. Utilization measures demand averaged over time. A deadline limits how much time a particular job has.
+
+As the number of tasks grows, the general bound approaches 69.3%. That percentage describes the worst-case guarantee. A particular task set can successfully use much more.
+
+Why RMS can reach 100%?
+
+### Harmonic set
+
+A task set has **harmonic periods** when every longer period is an integer multiple of every shorter period.
+
+$U = \frac{3}{6}+\frac{3}{12}+\frac{6}{24}=1$
+
+For harmonic periods, RMS guarantees schedulability up to 100% utilization under the same assumptions.
+
+RMS is optimal among fixed-priority assignments under the standard assumptions. If any fixed-priority assignment can meet all the deadlines for a task set, RMS can too.
 
 ## EDF
 
