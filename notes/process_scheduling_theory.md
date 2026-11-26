@@ -95,3 +95,84 @@ If you take this example, the traditional algorithm FCFS. So, we have two tasks 
 
 Now change one rule: allow \(T_1\) to preempt \(T_2\). Run \(T_2\) from 8–9, \(T_1\) from 9–10, then resume \(T_2\). The job due at 12 now finishes at 10 ms. The numbers \(P\), \(C\), and \(U\) stayed the same. Changing the execution order fixed this miss.
 
+
+# CLOCK DRIVEN SCHEDULING ALGO
+
+In clock-driven scheduling, the times when the scheduler makes decisions are chosen in advance.
+
+If all parameters about tasks (execution time/deadline) known in advance, schedule can be computed offline and stored as a table
+
+If not, scheduler periodically wakes up and generates a portion of the schedule
+
+Minimal runtime overhead but Not suitable for many applications.
+
+The major cycle is the duration of the whole table. The minor cycle, also called a frame, is the duration of one slot.
+
+The time axis is divided into equal size (usually) time slots (aka minor cycles) 
+
+$H = \operatorname{LCM}(25, 50, 100) = 100\ \text{ms}$
+
+$\Delta = \operatorname{GCD}(25, 50, 100) = 25\ \text{ms}$
+
+$N_{\text{frames}} = \frac{H}{\Delta} = \frac{100}{25} = 4$
+
+**Example :**
+
+Consider a periodic taskset T = {T1, T2, T3}
+
+P1 = 25ms, P2 = 50ms, P3 = 100ms
+
+C1 = 10ms, C2 = 5ms, C3 = 12ms
+
+Minor Cycle ∆ = gcd(25, 50, 100) = 25ms
+
+Major Cycle P = lcm(25, 50, 100) = 100ms
+
+Determine a schedule that respects the task periods
+
+Allocate tasks into slots of size ∆ = 25ms
+
+The schedule repeats every P = 100ms
+
+T1 must be scheduled every 25ms, T2 must be scheduled every 50ms, T3 must be scheduled every 100ms
+
+In every minor cycle, the tasks must execute for less than
+25ms
+
+<p align="center">
+  <img src="Images/EOS/eos_3.png" width="500">
+</p>
+
+So here in this example, the task one starts first and then followed by task three. The scheduler can also schedule task two, but it went with task three. Just to clarify.
+
+one design choice: you decide the execution order before the system starts.
+
+How TDMA is implemenyed here:
+
+TDMA stands for Time Division Multiple Access. Here, the resource being shared is one CPU, and the schedule table assigns its time to different tasks.
+1. Before execution, build the table and configure a periodic timer. In the example, the timer fires every 25 ms, once per minor cycle.
+2. At each timer tick, read the next row and execute its jobs in order. For the first row, T1 runs from 0 to 10 ms, then T3 runs from 10 to 22 ms. T3 starts as soon as T1 finishes because it is next in the row.
+3. When the row finishes, the CPU can sleep until the next tick. Here it can sleep from 22 to 25 ms. After the fourth row, the table wraps back to the first.
+
+| Advantage | Why TDMA gives you this advantage |
+|---|---|
+| **Simple implementation** | A timer, a table, and an index indicating the current row are enough to select the next job. |
+| **Low runtime overhead** | The CPU follows the stored order. It spends little time deciding which ready task should run next. |
+| **Predictable timing** | You can inspect the table before execution and check each deadline, provided you account for worst-case execution times and overhead. |
+| **Simpler shared-data handling** | On one CPU, jobs in the table run non-preemptively. If T1 updates a shared value and T3 reads it afterward, T1 finishes its update before T3 can access it. |
+
+Drawbacks:
+
+1. Adding a task requires revisiting the table
+2. Long or variable jobs are difficult to fit
+3. A long hyperperiod creates a long table
+4. Aperiodic requests are difficult to serve promptly
+
+# Prioirty based scheduling
+
+
+
+## RMS
+
+## EDF
+
