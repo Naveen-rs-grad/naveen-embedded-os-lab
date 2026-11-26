@@ -236,3 +236,31 @@ RMS is optimal among fixed-priority assignments under the standard assumptions. 
 
 ## EDF
 
+Real-time applications are generally not concerned with sheer speed but rather with completing (or starting) tasks at the most valuable times
+
+Preemptive algorithm in which task with earliest deadline has highest priority
+
+Priority of a task is not fixed
+
+If system has only periodic tasks, EDF is a static table-driven scheduling algorithm
+
+Information used for deadline scheduling:
+1. Ready time - time task becomes ready
+2. Starting deadline - time task must begin
+3. Completion deadline - time task must be completed
+4. processing time
+
+ready time (when a job can run), processing time (how much CPU time it needs), and a starting or completion deadline (when it must begin or finish).
+
+EDF runs the ready job whose absolute deadline comes first. The word job matters. Two successive jobs of the same task have different release times and therefore different absolute deadlines.
+
+$\text{Absolute deadline} = \text{release time} + \text{relative deadline}$
+
+<p align="center">
+  <img src="Images/EOS/eos_5.png" width="500">
+</p>
+
+Here we take the two task A and B. We say that task A has the period twenty and execution time of ten, and task B has the period fifty and execution time of twenty-five. The first diagram at the top mentions the arrival and deadline of each task where they were not scheduled. Now the second diagram illustrates. Let's say A has higher priority than B, and we can see that at T equal to 50 seconds, B1 gets missed. Now considering another case where B has higher priority than A, we can say that we can see that A1 gets missed. The first instance of A gets missed at T equal to 20 and. And the fourth instance of A gets missed on T equal to 80. 
+
+Now comes the earliest deadline scheduling. Now, based on the absolute deadline, which is shown in the top diagram, the tasks are getting scheduled. Now, at T equal to zero, we need to choose Which task to run from A and B, A has the nearest deadline, earliest deadline. So A is scheduled. Now B1, the first instance of B is getting scheduled. Now at T is equal to twenty, Here we have two jobs, A and B. So Now A2 is getting scheduled as the deadline of A2 is near. So A2 gets scheduled, and then followed by B1, the first instance of B. Now we have again two jobs, at T equal to 40. Now here the deadline for B is nearer than A3 deadline. So the B1 continues, and then A3 gets scheduled. And this is how we achieve the EDF scheduling, and the scheduling here is dynamic, based on the absolute deadline of each task.
+
